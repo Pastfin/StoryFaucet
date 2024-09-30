@@ -1,0 +1,2 @@
+[10/1/2024, 1:02:25 AM] Browser launched successfully
+[10/1/2024, 1:02:28 AM] MetaMask page not found
