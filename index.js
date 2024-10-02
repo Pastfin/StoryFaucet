@@ -3,10 +3,10 @@ const path = require('path');
 const ExcelJS = require('exceljs');
 const { logMessage, waitForAndClick, typeInput, addNetwork } = require('./metamask');
 
-async function loadBrowser(privateKey) {
+async function loadBrowser(privateKey, proxyOptions) {
     try {
         const metamaskPath = path.join(__dirname, '/12.3.0_0');
-        const { page, browser } = await connect({
+        const connectOptions = {
             headless: false,
             args: [
                 '--window-size=1920,1080',
@@ -21,8 +21,18 @@ async function loadBrowser(privateKey) {
             },
             disableXvfb: false,
             ignoreAllFlags: false,
-        });
+        };
 
+        if (proxyOptions) {
+            connectOptions.proxy = {
+                host: proxyOptions.host,
+                port: proxyOptions.port,
+                username: proxyOptions.username,
+                password: proxyOptions.password
+            };
+        }
+
+        const { page, browser } = await connect(connectOptions);
         logMessage('Browser launched successfully');
 
         await new Promise(resolve => setTimeout(resolve, 3000));
@@ -219,16 +229,24 @@ async function passSepoilaCaptcha(page) { // very dump way idk why first attempt
 
 async function main() {
     const workbook = new ExcelJS.Workbook();
-    await workbook.xlsx.readFile(path.join(__dirname, 'wallets.xlsx'));
+    await workbook.xlsx.readFile(path.join(__dirname, 'wallets_sample.xlsx'));
 
     const worksheet = workbook.getWorksheet(1);
 
     for (let rowNumber = 2; rowNumber <= worksheet.rowCount; rowNumber++) {
         const row = worksheet.getRow(rowNumber);
         const privateKey = row.getCell('B').value;
+        const proxy = row.getCell('C').value;
 
         if (privateKey) {
-            await loadBrowser(privateKey);
+            let proxyOptions = null;
+
+            if (proxy) {
+                const [host, port, username, password] = proxy.replace(' ', '').split(':');
+                proxyOptions = { host, port, username, password };
+            }
+
+            await loadBrowser(privateKey, proxyOptions);
             await new Promise(resolve => setTimeout(resolve, 3000));
         }
     }
