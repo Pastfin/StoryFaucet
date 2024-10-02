@@ -1,32 +1,43 @@
-const fs = require('fs');
-const path = require('path');
 
-// Log file setup
-const logFile = path.join(__dirname, 'log.txt');
+const { logMessage, waitForAndClick, typeInput } = require ('./helpers');
 
-function logMessage(message) {
-    const timestamp = new Date().toLocaleString(); // Local time logging
-    fs.appendFileSync(logFile, `[${timestamp}] ${message}\n`);
-}
+async function initMetamask(metamaskPage, privateKey) {
+    await waitForAndClick(metamaskPage, '#onboarding__terms-checkbox', 'Terms checkbox');
+    await waitForAndClick(metamaskPage, 'button[data-testid="onboarding-create-wallet"]:not([disabled])', 'Create Wallet button');
+    await waitForAndClick(metamaskPage, 'button[data-testid="metametrics-no-thanks"]', 'No Thanks button');
 
-async function waitForAndClick(page, selector, description) {
-    try {
-        await page.waitForSelector(selector, { visible: true });
-        await page.click(selector);
-        logMessage(`Clicked on: ${description}`);
-    } catch (error) {
-        logMessage(`Error clicking on: ${description} - ${error.message}`);
-    }
-}
+    const password = 'pwdpwdpwd123$$$'; // it doesn't matter
+    await typeInput(metamaskPage, 'input[data-testid="create-password-new"]', password, 'Create Password');
+    await typeInput(metamaskPage, 'input[data-testid="create-password-confirm"]', password, 'Confirm Password');
+    await waitForAndClick(metamaskPage, 'input[data-testid="create-password-terms"]', 'Password Terms checkbox');
+    await waitForAndClick(metamaskPage, 'button[data-testid="create-password-wallet"]:not([disabled])', 'Create Password Wallet button');
+    await waitForAndClick(metamaskPage, 'button[data-testid="secure-wallet-later"]', 'Secure Wallet Later button');
+    await waitForAndClick(metamaskPage, 'input[data-testid="skip-srp-backup-popover-checkbox"]', 'Skip SRP Backup checkbox');
+    await waitForAndClick(metamaskPage, 'button[data-testid="skip-srp-backup"]:not([disabled])', 'Skip SRP Backup button');
+    await waitForAndClick(metamaskPage, 'button[data-testid="onboarding-complete-done"]', 'Onboarding Complete button');
+    await waitForAndClick(metamaskPage, 'button[data-testid="pin-extension-next"]', 'Pin Extension Next button');
+    await waitForAndClick(metamaskPage, 'button[data-testid="pin-extension-done"]', 'Pin Extension Done button');
 
-async function typeInput(page, selector, value, description) {
-    try {
-        await page.waitForSelector(selector, { visible: true });
-        await page.type(selector, value);
-        logMessage(`Typed value in: ${description}`);
-    } catch (error) {
-        logMessage(`Error typing in: ${description} - ${error.message}`);
-    }
+    await new Promise(resolve => setTimeout(resolve, 3000));
+
+    await waitForAndClick(metamaskPage, 'button[data-testid="account-menu-icon"]', 'Account Menu Icon');
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    await waitForAndClick(metamaskPage, 'button[data-testid="multichain-account-menu-popover-action-button"]', 'Multichain Account Menu button');
+
+    await new Promise(resolve => setTimeout(resolve, 500));
+    await metamaskPage.evaluate(() => {
+        const button = [...document.querySelectorAll('button')].find(el => el.textContent.includes('Import account'));
+        if (button) {
+            button.click();
+        }
+    });
+
+    logMessage('Clicked on Import account button');
+
+    const privateKeyLast10 = privateKey.slice(-10);
+
+    await typeInput(metamaskPage, 'input#private-key-box', privateKey, `Private Key (last 10: ${privateKeyLast10})`);
+    await waitForAndClick(metamaskPage, 'button[data-testid="import-account-confirm-button"]:not([disabled])', 'Import Account Confirm button');
 }
 
 async function addNetwork(page, networkData) {
@@ -46,12 +57,11 @@ async function addNetwork(page, networkData) {
         logMessage('Network added: ' + networkData.name);
     } catch (error) {
         logMessage(`Error adding network: ${error.message}`);
+        throw error; 
     }
 }
 
 module.exports = {
-    logMessage,
-    waitForAndClick,
-    typeInput,
     addNetwork,
+    initMetamask
 };

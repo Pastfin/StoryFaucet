@@ -1,15 +1,18 @@
 const { connect } = require("puppeteer-real-browser");
 const path = require('path');
 const ExcelJS = require('exceljs');
-const { logMessage, waitForAndClick, typeInput, addNetwork } = require('./metamask');
+const { initMetamask, addNetwork  }  = require('./metamask');
+const { logMessage, waitForAndClick, waitForAndSmartClick } = require ('./helpers');
+const { error } = require("console");
 
 async function loadBrowser(privateKey, proxyOptions) {
+    let browser;
     try {
         const metamaskPath = path.join(__dirname, '/12.3.0_0');
         const connectOptions = {
             headless: false,
             args: [
-                '--window-size=1920,1080',
+                '--window-size=1280,1024',
                 '--disable-web-security',
                 `--disable-extensions-except=${metamaskPath}`, 
                 `--load-extension=${metamaskPath}`,
@@ -32,7 +35,8 @@ async function loadBrowser(privateKey, proxyOptions) {
             };
         }
 
-        const { page, browser } = await connect(connectOptions);
+        const { page, browser: launchedBrowser } = await connect(connectOptions);
+        browser = launchedBrowser;
         logMessage('Browser launched successfully');
 
         await new Promise(resolve => setTimeout(resolve, 3000));
@@ -55,42 +59,8 @@ async function loadBrowser(privateKey, proxyOptions) {
 
         logMessage('MetaMask page found, starting automation...');
 
-        await waitForAndClick(metamaskPage, '#onboarding__terms-checkbox', 'Terms checkbox');
-        await waitForAndClick(metamaskPage, 'button[data-testid="onboarding-create-wallet"]:not([disabled])', 'Create Wallet button');
-        await waitForAndClick(metamaskPage, 'button[data-testid="metametrics-no-thanks"]', 'No Thanks button');
-
-        const password = 'pwdpwdpwd123$$$';
-        await typeInput(metamaskPage, 'input[data-testid="create-password-new"]', password, 'Create Password');
-        await typeInput(metamaskPage, 'input[data-testid="create-password-confirm"]', password, 'Confirm Password');
-        await waitForAndClick(metamaskPage, 'input[data-testid="create-password-terms"]', 'Password Terms checkbox');
-        await waitForAndClick(metamaskPage, 'button[data-testid="create-password-wallet"]:not([disabled])', 'Create Password Wallet button');
-        await waitForAndClick(metamaskPage, 'button[data-testid="secure-wallet-later"]', 'Secure Wallet Later button');
-        await waitForAndClick(metamaskPage, 'input[data-testid="skip-srp-backup-popover-checkbox"]', 'Skip SRP Backup checkbox');
-        await waitForAndClick(metamaskPage, 'button[data-testid="skip-srp-backup"]:not([disabled])', 'Skip SRP Backup button');
-        await waitForAndClick(metamaskPage, 'button[data-testid="onboarding-complete-done"]', 'Onboarding Complete button');
-        await waitForAndClick(metamaskPage, 'button[data-testid="pin-extension-next"]', 'Pin Extension Next button');
-        await waitForAndClick(metamaskPage, 'button[data-testid="pin-extension-done"]', 'Pin Extension Done button');
-
-        await new Promise(resolve => setTimeout(resolve, 3000));
-
-        await waitForAndClick(metamaskPage, 'button[data-testid="account-menu-icon"]', 'Account Menu Icon');
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        await waitForAndClick(metamaskPage, 'button[data-testid="multichain-account-menu-popover-action-button"]', 'Multichain Account Menu button');
-
-        await new Promise(resolve => setTimeout(resolve, 500));
-        await metamaskPage.evaluate(() => {
-            const button = [...document.querySelectorAll('button')].find(el => el.textContent.includes('Import account'));
-            if (button) {
-                button.click();
-            }
-        });
-        logMessage('Clicked on Import account button');
-
+        await initMetamask(metamaskPage, privateKey);
         const privateKeyLast10 = privateKey.slice(-10);
-
-        await typeInput(metamaskPage, 'input#private-key-box', privateKey, `Private Key (last 10: ${privateKeyLast10})`);
-        await waitForAndClick(metamaskPage, 'button[data-testid="import-account-confirm-button"]:not([disabled])', 'Import Account Confirm button');
-
         logMessage(`Successfully imported account with private key ending in: ${privateKeyLast10}`);
 
         await new Promise(resolve => setTimeout(resolve, 2000));
@@ -102,7 +72,7 @@ async function loadBrowser(privateKey, proxyOptions) {
             currencySymbol: 'IP',
             blockExplorerUrl: 'https://testnet.storyscan.xyz/'
         };
-        
+
         await addNetwork(metamaskPage, networkData);
         logMessage('Network added successfully');
 
@@ -112,7 +82,8 @@ async function loadBrowser(privateKey, proxyOptions) {
 
         // Setup response interception with CDP
         const interceptUrl = "https://faucet.story.foundation/";
-        const client = await page.target().createCDPSession();
+        const client = await page.createCDPSession();
+
         await client.send('Network.enable');
         await client.send('Fetch.enable', {
             patterns: [{ urlPattern: '*', requestStage: 'Response' }],
@@ -148,6 +119,7 @@ async function loadBrowser(privateKey, proxyOptions) {
                     logMessage('Modified response from faucet');
                 } catch (error) {
                     logMessage(`Error modifying response: ${error.message}`);
+                    throw error;
                 }
             } else {
                 await client.send('Fetch.continueRequest', { requestId });
@@ -158,36 +130,37 @@ async function loadBrowser(privateKey, proxyOptions) {
 
         await passSepoilaCaptcha(page);
 
-        await waitForAndClick(page, 'button[data-testid="rk-connect-button"]', 'Connect Wallet button');
-        await new Promise(resolve => setTimeout(resolve, 1000));
-
-        try {
-            await page.waitForSelector('button[data-testid="rk-wallet-option-io.metamask"]', { timeout: 1000 });
-            logMessage('MetaMask Wallet Option button is visible after the first click');
-        } catch (error) {
-            logMessage('MetaMask Wallet Option button did not appear, performing a second click');
-            await waitForAndClick(page, 'button[data-testid="rk-connect-button"]', 'Connect Wallet button');
-        }
+        await page.waitForSelector('button[data-testid="rk-connect-button"]', { visible: true });
+        await page.evaluate(() => {
+            document.querySelector('button[data-testid="rk-connect-button"]').click();
+        });
+        await new Promise(resolve => setTimeout(resolve, 1500));
         
-        await waitForAndClick(page, 'button[data-testid="rk-wallet-option-io.metamask"]', 'MetaMask Wallet Option button');
-        await new Promise(resolve => setTimeout(resolve, 3000));
+        await waitForAndSmartClick(page, 'button[data-testid="rk-wallet-option-io.metamask"]', 'MetaMask Wallet Option button');
+        await new Promise(resolve => setTimeout(resolve, 5000));
 
         const currentPages = await browser.pages();
         let metaMaskPageConnect;
-
-        for (let page of currentPages) {
-            const url = await page.url();
+        console.log(currentPages);
+        for (let currentPage of currentPages) {
+            const url = await currentPage.url();
+            console.log(url);
             if (url.includes('connect')) {
-                metaMaskPageConnect = page;
+                metaMaskPageConnect = currentPage;
                 break;
+            }
+            else if (url.includes('coinbase')){
+                currentPage.close();
             }
         }
 
         if (metaMaskPageConnect) {
-            await waitForAndClick(metaMaskPageConnect, '[data-testid="page-container-footer-next"]', 'Connect Next button');
-            await waitForAndClick(metaMaskPageConnect, '[data-testid="page-container-footer-next"]', 'Connect Confirm button');
+            metaMaskPageConnect.bringToFront();
+            await waitForAndSmartClick(metaMaskPageConnect, '[data-testid="page-container-footer-next"]', 'Connect Next button');
+            await waitForAndSmartClick(metaMaskPageConnect, '[data-testid="page-container-footer-next"]', 'Connect Confirm button');
         } else {
             logMessage("Connection confirmation page not found");
+            throw error;
         }
 
         await page.bringToFront();
@@ -205,7 +178,7 @@ async function loadBrowser(privateKey, proxyOptions) {
         });
         
         if (claimButtonExists) {
-            logMessage("IP Claimed!");
+            logMessage(`IP Claimed! Private key ending in: ${privateKeyLast10}`);
         } else {
             logMessage("Claim button not found.");
         }
@@ -217,6 +190,10 @@ async function loadBrowser(privateKey, proxyOptions) {
 
     } catch (error) {
         logMessage(`Error in loadBrowser function: ${error.message}`);
+        if (browser) {
+            await browser.close();
+        }
+        throw error;
     }
 }
 
@@ -231,6 +208,7 @@ async function main() {
     const workbook = new ExcelJS.Workbook();
     await workbook.xlsx.readFile(path.join(__dirname, 'wallets.xlsx'));
 
+    const numOfRetriesPerWallet = 3;
     const worksheet = workbook.getWorksheet(1);
 
     for (let rowNumber = 2; rowNumber <= worksheet.rowCount; rowNumber++) {
@@ -246,8 +224,27 @@ async function main() {
                 proxyOptions = { host, port, username, password };
             }
 
-            await loadBrowser(privateKey, proxyOptions);
-            await new Promise(resolve => setTimeout(resolve, 3000));
+            let attempts = 0;
+            let success = false;
+
+            while (attempts < numOfRetriesPerWallet && !success) {
+                try {
+                    await loadBrowser(privateKey, proxyOptions);
+                    success = true;
+                } catch (error) {
+                    attempts++;
+                    logMessage(`Attempt ${attempts} failed: ${error.message}`);
+                    if (attempts < numOfRetriesPerWallet) {
+                        logMessage(`Retrying... (${attempts + 1}/${numOfRetriesPerWallet})`);
+                    }
+                }
+            }
+
+            if (!success) {
+                logMessage(`Failed to process wallet with private key ending in: ${privateKey.slice(-10)} after ${numOfRetriesPerWallet} attempts`);
+            }
+
+            await new Promise(resolve => setTimeout(resolve, 500));
         }
     }
 }
