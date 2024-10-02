@@ -141,10 +141,8 @@ async function loadBrowser(privateKey, proxyOptions) {
 
         const currentPages = await browser.pages();
         let metaMaskPageConnect;
-        console.log(currentPages);
         for (let currentPage of currentPages) {
             const url = await currentPage.url();
-            console.log(url);
             if (url.includes('connect')) {
                 metaMaskPageConnect = currentPage;
                 break;
