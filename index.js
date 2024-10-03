@@ -57,7 +57,7 @@ async function loadBrowser(privateKey, proxyOptions, metamaskVersion) {
             return;
         }
 
-        logMessage('MetaMask page found, starting automation...');
+        logMessage('MetaMask page found, starting automation...', "Debug");
 
         await initMetamask(metamaskPage, privateKey);
         const privateKeyLast10 = privateKey.slice(-10);
@@ -74,7 +74,6 @@ async function loadBrowser(privateKey, proxyOptions, metamaskVersion) {
         };
 
         await addNetwork(metamaskPage, networkData);
-        logMessage('Network added successfully');
 
         await new Promise(resolve => setTimeout(resolve, 1500));
         await waitForAndClick(metamaskPage, 'button.home__new-network-added__switch-to-button', 'Switch to New Network button');
@@ -115,8 +114,6 @@ async function loadBrowser(privateKey, proxyOptions, metamaskVersion) {
                         responseHeaders: modifiedHeaders,
                         body: Buffer.from(modifiedBody).toString('base64'),
                     });
-
-                    logMessage('Modified response from faucet');
                 } catch (error) {
                     logMessage(`Error modifying response: ${error.message}`);
                     throw error;
@@ -125,8 +122,6 @@ async function loadBrowser(privateKey, proxyOptions, metamaskVersion) {
                 await client.send('Fetch.continueRequest', { requestId });
             }
         });
-
-        logMessage('Started request interception for faucet URL');
 
         await passSepoilaCaptcha(page);
 

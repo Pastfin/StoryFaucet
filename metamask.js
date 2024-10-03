@@ -32,7 +32,7 @@ async function initMetamask(metamaskPage, privateKey) {
         }
     });
 
-    logMessage('Clicked on Import account button');
+    logMessage('Clicked on Import account button', "Debug");
 
     const privateKeyLast10 = privateKey.slice(-10);
 
