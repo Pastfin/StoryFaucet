@@ -5,10 +5,10 @@ const { initMetamask, addNetwork  }  = require('./metamask');
 const { logMessage, waitForAndClick, waitForAndSmartClick } = require ('./helpers');
 const { error } = require("console");
 
-async function loadBrowser(privateKey, proxyOptions) {
+async function loadBrowser(privateKey, proxyOptions, metamaskVersion) {
     let browser;
     try {
-        const metamaskPath = path.join(__dirname, '/12.3.0_0');
+        const metamaskPath = path.join(__dirname, metamaskVersion);
         const connectOptions = {
             headless: false,
             args: [
@@ -205,9 +205,11 @@ async function passSepoilaCaptcha(page) { // very dump way idk why first attempt
 async function main() {
     const workbook = new ExcelJS.Workbook();
     await workbook.xlsx.readFile(path.join(__dirname, 'wallets.xlsx'));
-
-    const numOfRetriesPerWallet = 3;
+    
     const worksheet = workbook.getWorksheet(1);
+    
+    const numOfRetriesPerWallet = 3;
+    const metamaskVersion = '/12.3.1_0';
 
     for (let rowNumber = 2; rowNumber <= worksheet.rowCount; rowNumber++) {
         const row = worksheet.getRow(rowNumber);
@@ -227,7 +229,7 @@ async function main() {
 
             while (attempts < numOfRetriesPerWallet && !success) {
                 try {
-                    await loadBrowser(privateKey, proxyOptions);
+                    await loadBrowser(privateKey, proxyOptions, metamaskVersion);
                     success = true;
                 } catch (error) {
                     attempts++;
