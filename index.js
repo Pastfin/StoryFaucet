@@ -186,7 +186,6 @@ async function loadBrowser(privateKey, proxyOptions, metamaskVersion) {
         if (browser) {
             await browser.close();
         }
-        throw error;
     }
 }
 
