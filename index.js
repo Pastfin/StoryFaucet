@@ -198,7 +198,7 @@ async function passSepoilaCaptcha(page) { // very dump way idk why first attempt
 
 async function main() {
     const workbook = new ExcelJS.Workbook();
-    await workbook.xlsx.readFile(path.join(__dirname, 'prod_wallets_story.xlsx'));
+    await workbook.xlsx.readFile(path.join(__dirname, 'wallets.xlsx'));
     
     const worksheet = workbook.getWorksheet(1);
     
