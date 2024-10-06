@@ -26,7 +26,9 @@ async function initMetamask(metamaskPage, privateKey) {
 
     await new Promise(resolve => setTimeout(resolve, 500));
     await metamaskPage.evaluate(() => {
-        const button = [...document.querySelectorAll('button')].find(el => el.textContent.includes('Import account'));
+        const button = [...document.querySelectorAll('button')].find(el => 
+            el.textContent.includes('Import account') || el.textContent.includes('Импортировать счет')
+        );
         if (button) {
             button.click();
         }
