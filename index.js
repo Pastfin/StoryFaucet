@@ -39,7 +39,7 @@ async function loadBrowser(privateKey, proxyOptions, metamaskVersion) {
         browser = launchedBrowser;
         logMessage('Browser launched successfully');
 
-        await new Promise(resolve => setTimeout(resolve, 3000));
+        await new Promise(resolve => setTimeout(resolve, 4500));
 
         const pages = await browser.pages();
         let metamaskPage;
@@ -205,27 +205,15 @@ async function loadBrowser(privateKey, proxyOptions, metamaskVersion) {
     }
 }
 
-async function passSepoilaCaptcha(page) { // very dump way idk why first attempt in 50% fails. 
+async function passSepoilaCaptcha(page) { // very dumb way idk why first attempt in 50% fails. 
     await page.goto('https://faucet.story.foundation/');
     await new Promise(resolve => setTimeout(resolve, 5500));
     await page.goto('https://faucet.story.foundation/');
     await new Promise(resolve => setTimeout(resolve, 7500));
 }
 
-async function main() {
-    const workbook = new ExcelJS.Workbook();
-    await workbook.xlsx.readFile(path.join(__dirname, 'wallets.xlsx'));
-    
-    const worksheet = workbook.getWorksheet(1);
-    
-    const numOfRetriesPerWallet = 3;
-    const metamaskVersion = '/12.3.1_0';
-
-    let rowNumbers = Array.from({ length: worksheet.rowCount - 1}, (_, i) => i + 2);
-    rowNumbers = rowNumbers.sort(() => Math.random() - 0.5);
-
-    for (let i = 0; i < rowNumbers.length; i++) {
-        const rowNumber = rowNumbers[i];
+async function runThreads(batchList, worksheet, numOfRetriesPerWallet, metamaskVersion) {
+    const tasks = batchList.map(async (rowNumber) => {
         const row = worksheet.getRow(rowNumber);
         const privateKey = row.getCell('B').value;
         const proxy = row.getCell('C').value;
@@ -258,8 +246,30 @@ async function main() {
                 logMessage(`Failed to process wallet with private key ending in: ${privateKey.slice(-10)} after ${numOfRetriesPerWallet} attempts`);
             }
 
-            await new Promise(resolve => setTimeout(resolve, 500));
         }
+    });
+
+    await Promise.all(tasks);
+}
+
+async function main() {
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.readFile(path.join(__dirname, 'wallets.xlsx'));
+    
+    const worksheet = workbook.getWorksheet(1);
+    
+    const numOfRetriesPerWallet = 3;
+    const numOfThreads = 1;
+    const metamaskVersion = '/12.3.1_0';
+
+    let rowNumbers = Array.from({ length: worksheet.rowCount - 1}, (_, i) => i + 2);
+    rowNumbers = rowNumbers.sort(() => Math.random() - 0.5);
+    
+    const numOfIteration = Math.ceil(rowNumbers.length/numOfThreads);
+    
+    for (let i = 0; i < numOfIteration; i++) {
+        let batchList = rowNumbers.slice(i*numOfThreads, (i+1)*numOfThreads);
+        await runThreads(batchList, worksheet, numOfRetriesPerWallet, metamaskVersion);
     }
 }
 

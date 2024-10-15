@@ -5,8 +5,9 @@ const logFile = path.join(__dirname, 'log.txt');
 function logMessage(message, logLevel = "Info") {
     if (logLevel == "Info"){ // Can be "Info" or "Debug"
         const timestamp = new Date().toLocaleString(); // Local time logging
-        const logText = `[${timestamp}] ${message}\n`;
-        fs.appendFileSync(logFile, logText);
+        const logText = `[${timestamp}] ${message}`;
+        console.log(logText);
+        fs.appendFileSync(logFile, logText + '\n');
     }
 }
 
