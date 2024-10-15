@@ -90,15 +90,27 @@ async function loadBrowser(privateKey, proxyOptions, metamaskVersion) {
 
         client.on('Fetch.requestPaused', async (event) => {
             const { requestId, request, responseHeaders } = event;
-
-            if (request.url === interceptUrl && request.method === 'POST') {
-                try {
+        
+            if (!requestId) {
+                logMessage('Request ID is missing, skipping this request.');
+                return;
+            }
+        
+            try {
+                if (request.url === interceptUrl && request.method === 'POST') {
                     const response = await client.send('Fetch.getResponseBody', { requestId });
+        
+                    if (!response || !response.body) {
+                        logMessage('No response body available, skipping this request.');
+                        await client.send('Fetch.continueRequest', { requestId });
+                        return;
+                    }
+        
                     const originalBody = Buffer.from(response.body, 'base64').toString();
                     const randomValue = (Math.random() * (20 - 10) + 10).toFixed(20);
                     const preciseValue = parseFloat(randomValue).toPrecision(25);
                     const modifiedBody = originalBody.replace(/"data":"[^"]+"/, `"data":"${preciseValue}"`);
-
+        
                     const modifiedHeaders = responseHeaders
                         .filter(header => header.name.toLowerCase() !== 'content-encoding')
                         .map(header => {
@@ -107,19 +119,22 @@ async function loadBrowser(privateKey, proxyOptions, metamaskVersion) {
                             }
                             return header;
                         });
-
+        
                     await client.send('Fetch.fulfillRequest', {
                         requestId,
                         responseCode: 200,
                         responseHeaders: modifiedHeaders,
                         body: Buffer.from(modifiedBody).toString('base64'),
                     });
-                } catch (error) {
-                    logMessage(`Error modifying response: ${error.message}`);
-                    throw error;
+                } else {
+                    await client.send('Fetch.continueRequest', { requestId });
                 }
-            } else {
-                await client.send('Fetch.continueRequest', { requestId });
+            } catch (error) {
+                if (error.message.includes('Invalid InterceptionId')) {
+                    logMessage(`Invalid InterceptionId for request ${requestId}. Skipping.`);
+                } else {
+                    logMessage(`Unexpected error for request ${requestId}: ${error.message}`);
+                }
             }
         });
 
