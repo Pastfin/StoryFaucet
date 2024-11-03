@@ -140,10 +140,8 @@ async function loadBrowser(privateKey, proxyOptions, metamaskVersion) {
 
         await passSepoilaCaptcha(page);
 
-        await page.waitForSelector('button[data-testid="rk-connect-button"]', { visible: true });
-        await page.evaluate(() => {
-            document.querySelector('button[data-testid="rk-connect-button"]').click();
-        });
+        await waitForAndSmartClick(page, 'button[data-testid="rk-connect-button"]', 'MetaMask click button');
+        
         await new Promise(resolve => setTimeout(resolve, 1500));
         
         await waitForAndSmartClick(page, 'button[data-testid="rk-wallet-option-io.metamask"]', 'MetaMask Wallet Option button');
